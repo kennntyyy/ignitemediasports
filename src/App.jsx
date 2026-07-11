@@ -94,10 +94,18 @@ const serviceFrames = [
   },
 ];
 
+const sidebarLinks = [
+  { num: '01', label: 'Work', id: 'portfolio' },
+  { num: '02', label: 'Services', id: 'services' },
+  { num: '03', label: 'Teams', id: 'teams' },
+  { num: '04', label: 'Journal', id: 'journal' },
+  { num: '05', label: 'Contact', id: 'footer' },
+];
+
 const emailBookingUrl =
   'mailto:tiffany@bydesigncontentcreation.com?subject=Ignite%20Motion%20Sports%20Media%20Consultation&body=Hi%20Tiffany%2C%0A%0AI%27d%20like%20to%20book%20a%20consultation%20call%20about%20my%20sports%20photo%20project.%0A%0AThanks!';
 
-function JustifiedGrid({ photos, altPrefix }) {
+function JustifiedGrid({ photos, altPrefix, onPhotoClick }) {
   const containerRef = React.useRef(null);
   const [width, setWidth] = useState(0);
   const [items, setItems] = useState([]);
@@ -119,11 +127,11 @@ function JustifiedGrid({ photos, altPrefix }) {
     }
     Promise.all(
       photos.map(
-        (src) =>
+        (src, idx) =>
           new Promise((resolve) => {
             const img = new Image();
             img.onload = () =>
-              resolve({ src, ratio: img.naturalWidth / img.naturalHeight || 1 });
+              resolve({ src, idx, ratio: img.naturalWidth / img.naturalHeight || 1 });
             img.onerror = () => resolve(null);
             img.src = src;
           })
@@ -173,6 +181,7 @@ function JustifiedGrid({ photos, altPrefix }) {
                 src={item.src}
                 alt={`${altPrefix} photo`}
                 loading="lazy"
+                onClick={() => onPhotoClick(item.idx)}
                 style={{ width: item.ratio * rowHeight, height: rowHeight }}
               />
             ))}
@@ -183,9 +192,157 @@ function JustifiedGrid({ photos, altPrefix }) {
   );
 }
 
+const PHOTOS_PER_PAGE = 9;
+
+function PortfolioSection({ section, onOpenLightbox }) {
+  const [page, setPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(section.photos.length / PHOTOS_PER_PAGE));
+  const start = page * PHOTOS_PER_PAGE;
+  const currentPhotos = section.photos.slice(start, start + PHOTOS_PER_PAGE);
+
+  return (
+    <div className="portfolio-block">
+      <div className="portfolio-block-header">
+        <h3>{section.title}</h3>
+        <span className="frame-exif">{section.detail}</span>
+      </div>
+
+      {section.photos.length > 0 ? (
+        <JustifiedGrid
+          photos={currentPhotos}
+          altPrefix={section.title}
+          onPhotoClick={(localIdx) => onOpenLightbox(section.photos, start + localIdx)}
+        />
+      ) : (
+        <div className="frame-art" style={{ position: 'static', height: '200px' }} />
+      )}
+
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            disabled={page === 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+          >
+            Prev
+          </button>
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button
+              key={i}
+              className={i === page ? 'active' : ''}
+              onClick={() => setPage(i)}
+            >
+              {String(i + 1).padStart(2, '0')}
+            </button>
+          ))}
+          <button
+            disabled={page === totalPages - 1}
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Lightbox({ photos, index, onClose, onNavigate }) {
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') onNavigate(-1);
+      if (e.key === 'ArrowRight') onNavigate(1);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose, onNavigate]);
+
+  if (index === null) return null;
+
+  return (
+    <div className="lightbox-overlay" onClick={onClose}>
+      <button className="lightbox-close" onClick={onClose} aria-label="Close">
+        ×
+      </button>
+      {photos.length > 1 && (
+        <button
+          className="lightbox-prev"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNavigate(-1);
+          }}
+          aria-label="Previous photo"
+        >
+          ‹
+        </button>
+      )}
+      <img
+        src={photos[index]}
+        alt=""
+        onClick={(e) => e.stopPropagation()}
+      />
+      {photos.length > 1 && (
+        <button
+          className="lightbox-next"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNavigate(1);
+          }}
+          aria-label="Next photo"
+        >
+          ›
+        </button>
+      )}
+      {photos.length > 1 && (
+        <div className="lightbox-counter">
+          {index + 1} / {photos.length}
+        </div>
+      )}
+    </div>
+  );
+}
+function Sidebar() {
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-top">
+        <div className="sidebar-logo">
+          <img className="sidebar-logo-image" src="/photos/logo.png" alt="Ignite Motion Sports Media" />
+        </div>
+        <ul className="sidebar-nav">
+          {sidebarLinks.map((link) => (
+            <li key={link.id}>
+              <a className="sidebar-link" href={`#${link.id}`}>
+                <span className="num">{link.num}</span>
+                <span className="label">{link.label}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="sidebar-bottom">
+        <div className="sidebar-status">
+          <span className="dot" />
+          Based in Denver, CO
+        </div>
+        <a className="sidebar-cta" href="#booking">
+          Book a consultation
+        </a>
+      </div>
+    </aside>
+  );
+}
+
 export default function App() {
-  const scrollToId = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  const [lightbox, setLightbox] = useState(null); // { photos, index } | null
+
+  const openLightbox = (photos, index) => setLightbox({ photos, index });
+  const closeLightbox = () => setLightbox(null);
+  const navigateLightbox = (delta) => {
+    setLightbox((lb) => {
+      if (!lb) return lb;
+      const nextIndex = (lb.index + delta + lb.photos.length) % lb.photos.length;
+      return { ...lb, index: nextIndex };
+    });
   };
 
   useEffect(() => {
@@ -196,104 +353,89 @@ export default function App() {
 
   return (
     <>
-      <nav>
-        <div className="logo">
-          <img className="logo-image" src="/photos/logo.png" alt="Ignite Motion Sports Media" />
-        </div>
-        {/* <ul className="nav-links">
-          <li><button className="nav-link-btn" onClick={() => scrollToId('portfolio')}>Portfolio</button></li>
-          <li><button className="nav-link-btn" onClick={() => scrollToId('booking')}>Book</button></li>
-          <li><button className="nav-link-btn" onClick={() => scrollToId('services')}>Text</button></li>
-          <li><button className="nav-link-btn" onClick={() => scrollToId('footer')}>Contact</button></li>
-        </ul> */}
-        <button className="cta-btn" onClick={() => scrollToId('booking')}>
-          Book a consultation
-        </button>
-      </nav>
+      <Sidebar />
 
-      <main>
-        <section className="hero" id="top">
-          <div className="wrap">
-            <div className="eyebrow">Sports photography studio</div>
-            <h1>
-              Capture the<br /><span className="accent">ignition point.</span>
-            </h1>
-            <p>
-              We shoot the half-second before the crowd reacts — the release, the impact, the breakaway. Game day, editorial, and athlete portraiture for teams who play for keeps.
-            </p>
-            {/* <div className="hero-actions">
-              <button className="cta-btn" onClick={() => scrollToId('portfolio')}>See the portfolio</button>
-              <button className="ghost-btn" onClick={() => scrollToId('booking')}>Book a consultation call</button>
-            </div> */}
+      <div className="with-sidebar">
+        <main>
+          <section className="hero" id="top">
+            <div className="wrap">
+              <div className="eyebrow">Sports photography studio</div>
+              <h1>
+                Capture the<br /><span className="accent">ignition point.</span>
+              </h1>
+              <p>
+                We shoot the half-second before the crowd reacts — the release, the impact, the breakaway. Game day, editorial, and athlete portraiture for teams who play for keeps.
+              </p>
+            </div>
+            <div className="scanline" />
+          </section>
+
+          <div className="marquee" aria-hidden="true">
+            <div className="marquee-track">
+              <span className="hot">Basketball</span><span>·</span><span>Editorial</span><span>·</span><span className="hot">Jiu jitsu</span><span>·</span><span>Consultation calls</span><span>·</span><span className="hot">Individual sports shots</span><span>·</span><span>Denver, CO</span><span>·</span>
+              <span className="hot">Basketball</span><span>·</span><span>Editorial</span><span>·</span><span className="hot">Jiu jitsu</span><span>·</span><span>Consultation calls</span><span>·</span><span className="hot">Individual sports shots</span><span>·</span><span>Denver, CO</span><span>·</span>
+              <span className="hot">Basketball</span><span>·</span><span>Editorial</span><span>·</span><span className="hot">Jiu jitsu</span><span>·</span><span>Consultation calls</span><span>·</span><span className="hot">Individual sports shots</span><span>·</span><span>Denver, CO</span><span>·</span>
+              <span className="hot">Basketball</span><span>·</span><span>Editorial</span><span>·</span><span className="hot">Jiu jitsu</span><span>·</span><span>Consultation calls</span><span>·</span><span className="hot">Individual sports shots</span><span>·</span><span>Denver, CO</span><span>·</span>
+            </div>
           </div>
-          <div className="scanline" />
-        </section>
 
-        <div className="marquee" aria-hidden="true">
-          <div className="marquee-track">
-            <span className="hot">Basketball</span><span>·</span><span>Editorial</span><span>·</span><span className="hot">Jiu jitsu</span><span>·</span><span>Consultation calls</span><span>·</span><span className="hot">Individual sports shots</span><span>·</span><span>Denver, CO</span><span>·</span>
-            <span className="hot">Basketball</span><span>·</span><span>Editorial</span><span>·</span><span className="hot">Jiu jitsu</span><span>·</span><span>Consultation calls</span><span>·</span><span className="hot">Individual sports shots</span><span>·</span><span>Denver, CO</span><span>·</span>
-            <span className="hot">Basketball</span><span>·</span><span>Editorial</span><span>·</span><span className="hot">Jiu jitsu</span><span>·</span><span>Consultation calls</span><span>·</span><span className="hot">Individual sports shots</span><span>·</span><span>Denver, CO</span><span>·</span>
-            <span className="hot">Basketball</span><span>·</span><span>Editorial</span><span>·</span><span className="hot">Jiu jitsu</span><span>·</span><span>Consultation calls</span><span>·</span><span className="hot">Individual sports shots</span><span>·</span><span>Denver, CO</span><span>·</span>
-          </div>
-        </div>
+          <section className="gallery" id="portfolio">
+            <div className="wrap">
+              <div className="section-title">portfolio</div>
 
-        <section className="gallery" id="portfolio">
-          <div className="wrap">
-            {/* <div className="section-label">Portfolio</div> */}
-            <div className="section-title">portfolio</div>
-
-            {portfolioSections.map((section) => (
-              <div className="portfolio-block" key={section.title}>
-                <div className="portfolio-block-header">
-                  <h3>{section.title}</h3>
-                  <span className="frame-exif">{section.detail}</span>
-                </div>
-                {section.photos.length > 0 ? (
-                  <JustifiedGrid photos={section.photos} altPrefix={section.title} />
-                ) : (
-                  <div className="frame-art" style={{ position: 'static', height: '200px' }} />
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="services" id="services">
-          <div className="wrap">
-            <div className="section-label">What we shoot</div>
-            <div className="section-title">Built for teams and athletes</div>
-            <div className="service-grid">
-              {serviceFrames.map((service) => (
-                <div className="service-card" key={service.frame}>
-                  <div className="service-frame">FRAME <span>{service.frame}</span></div>
-                  <h3>{service.title}</h3>
-                  <p>{service.copy}</p>
-                </div>
+              {portfolioSections.map((section) => (
+                <PortfolioSection
+                  key={section.title}
+                  section={section}
+                  onOpenLightbox={openLightbox}
+                />
               ))}
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="footer-cta" id="booking">
-          <div className="wrap">
-            <div className="section-label">Ready when you are</div>
-            <h2>Let's set up your<br />consultation call.</h2>
-            <p className="footer-cta-copy">
-              Use the email button to send a consultation request directly, or tap the text link below to send a message for free through your phone's SMS app.
-            </p>
-            <div className="footer-cta-actions">
-              <a className="cta-btn" href={emailBookingUrl}>Email to book</a>
-              <a className="ghost-btn" href="sms:+17208282804">Text me for free</a>
+          <section className="services" id="services">
+            <div className="wrap">
+              <div className="section-label">What we shoot</div>
+              <div className="section-title">Built for teams and athletes</div>
+              <div className="service-grid">
+                {serviceFrames.map((service) => (
+                  <div className="service-card" key={service.frame}>
+                    <div className="service-frame">FRAME <span>{service.frame}</span></div>
+                    <h3>{service.title}</h3>
+                    <p>{service.copy}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
-      </main>
+          </section>
 
-      <footer id="footer">
-        <span>© Ignite Motion Sports Media 2026</span>
-        <span>Denver, CO</span>
-      </footer>
+          <section className="footer-cta" id="booking">
+            <div className="wrap">
+              <div className="section-label">Ready when you are</div>
+              <h2>Let's set up your<br />consultation call.</h2>
+              <p className="footer-cta-copy">
+                Use the email button to send a consultation request directly, or tap the text link below to send a message for free through your phone's SMS app.
+              </p>
+              <div className="footer-cta-actions">
+                <a className="cta-btn" href={emailBookingUrl}>Email to book</a>
+                <a className="ghost-btn" href="sms:+17208282804">Text me for free</a>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <footer id="footer">
+          <span>© Ignite Motion Sports Media 2026</span>
+          <span>Denver, CO</span>
+        </footer>
+      </div>
+
+      <Lightbox
+        photos={lightbox?.photos ?? []}
+        index={lightbox?.index ?? null}
+        onClose={closeLightbox}
+        onNavigate={navigateLightbox}
+      />
     </>
   );
 }
