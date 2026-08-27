@@ -27,7 +27,10 @@ async function readRedisValue(path) {
   return response.json();
 }
 
-async function writeRedisValue(path, body) {
+// IMPORTANT: Upstash's REST API expects the raw value as the POST body itself,
+// not wrapped in a JSON object. Sending { value: "..." } causes the entire
+// wrapper object to be stored as the value, one level too deep.
+async function writeRedisValue(path, rawStringValue) {
   const baseUrl = getEnv('KV_REST_API_URL').replace(/\/$/, '');
   const token = getEnv('KV_REST_API_TOKEN');
 
@@ -35,9 +38,9 @@ async function writeRedisValue(path, body) {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      'Content-Type': 'text/plain',
     },
-    body: JSON.stringify(body),
+    body: rawStringValue,
   });
 
   if (!response.ok) {
@@ -62,6 +65,6 @@ export async function getStoredContent() {
 
 export async function setStoredContent(content) {
   const normalizedContent = normalizeContent(content);
-  await writeRedisValue(`/set/${CONTENT_KEY}`, { value: JSON.stringify(normalizedContent) });
+  await writeRedisValue(`/set/${CONTENT_KEY}`, JSON.stringify(normalizedContent));
   return normalizedContent;
 }
