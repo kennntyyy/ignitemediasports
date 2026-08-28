@@ -17,6 +17,7 @@ export default function AdminPanel({
 }) {
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
+  const [dragged, setDragged] = useState(null); // { sectionIndex, photoIndex }
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -183,7 +184,6 @@ export default function AdminPanel({
     }));
   };
 
-  const [dragged, setDragged] = useState(null); // { sectionIndex, photoIndex }
   const handleDragStart = (sectionIndex, photoIndex) => setDragged({ sectionIndex, photoIndex });
   const handleDragOver = (e) => e.preventDefault();
   const handleDrop = (sectionIndex, targetIndex) => {
