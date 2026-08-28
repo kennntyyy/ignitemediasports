@@ -154,19 +154,20 @@ export function normalizeContent(input) {
         : fallback.marqueeItems,
     portfolio:
       Array.isArray(content.portfolio) && content.portfolio.length > 0
-        ? content.portfolio.map((section, index) => ({
-            ...fallback.portfolio[index],
-            ...section,
-            photos:
-              Array.isArray(section.photos) && section.photos.length > 0
-                ? section.photos
-                : fallback.portfolio[index].photos,
-          }))
+        ? content.portfolio.map((section, index) => {
+            const fb = fallback.portfolio[index] ?? fallback.portfolio[0] ?? { photos: [] };
+            return {
+              ...fb,
+              ...section,
+              photos:
+                Array.isArray(section.photos) && section.photos.length > 0 ? section.photos : fb.photos,
+            };
+          })
         : fallback.portfolio,
     services:
       Array.isArray(content.services) && content.services.length > 0
         ? content.services.map((service, index) => ({
-            ...fallback.services[index],
+            ...(fallback.services[index] ?? fallback.services[0] ?? {}),
             ...service,
           }))
         : fallback.services,

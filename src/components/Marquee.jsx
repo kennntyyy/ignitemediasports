@@ -1,21 +1,20 @@
 import React from 'react';
 
-export default function Marquee() {
+export default function Marquee({ items }) {
+  const trackItems = [...items, '·'];
+
   return (
-    <div className="ignite-strip" aria-hidden="true">
-      <div className="ignite-strip-track">
-        <span className="hot">Basketball</span>
-        <span>Jiu jitsu</span>
-        <span className="hot">Individual sports shots</span>
-        <span>Consultation calls</span>
-        <span className="hot">Text contact</span>
-        <span>Photo-ready layouts</span>
-        <span className="hot">Basketball</span>
-        <span>Jiu jitsu</span>
-        <span className="hot">Individual sports shots</span>
-        <span>Consultation calls</span>
-        <span className="hot">Text contact</span>
-        <span>Photo-ready layouts</span>
+    <div className="marquee" aria-hidden="true">
+      <div className="marquee-track">
+        {Array.from({ length: 4 }).map((_, repeatIndex) => (
+          <React.Fragment key={repeatIndex}>
+            {trackItems.map((item, itemIndex) => (
+              <span className={item === '·' ? '' : 'hot'} key={`${repeatIndex}-${itemIndex}-${item}`}>
+                {item}
+              </span>
+            ))}
+          </React.Fragment>
+        ))}
       </div>
     </div>
   );
