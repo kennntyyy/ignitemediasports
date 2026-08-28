@@ -6,6 +6,34 @@ import AdminPanel from './components/AdminPanel.jsx';
 import PublicSite from './components/PublicSite.jsx';
 import Lightbox from './components/Lightbox.jsx';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) { console.error('Admin crash', error, info); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 24, background: '#111', color: '#fff', minHeight: '100vh' }}>
+          <h2 style={{ color: '#fb531e' }}>Admin crashed</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', background: '#222', padding: 16, borderRadius: 8, marginTop: 12 }}>
+            {String(this.state.error?.message ?? this.state.error)}
+            {'\n'}
+            {String(this.state.error?.stack ?? '')}
+          </pre>
+          <button
+            onClick={() => { localStorage.removeItem(STORAGE_KEY); location.reload(); }}
+            style={{ marginTop: 16, padding: '10px 16px', background: '#fb531e', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+          >
+            Clear local draft & reload
+          </button>
+          <a href="/" style={{ marginLeft: 12, color: '#fff', textDecoration: 'underline' }}>Back to site</a>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const { present: content, set: setContent, undo, redo, replace: replaceContent, canUndo, canRedo } =
     useUndoableState(readStoredContent());
@@ -140,25 +168,30 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [adminMode, isAuthenticated, undo, redo]);
 
+  // Guard against malformed content (e.g. stale localStorage)
+  const safeContent = content && typeof content === 'object' && content.theme ? content : defaultContent;
+
   return (
     <>
       {adminMode ? (
-        <AdminPanel
-          content={content}
-          onChangeContent={setContent}
-          onResetContent={resetContent}
-          isAuthenticated={isAuthenticated}
-          onRequestLogin={requestLogin}
-          onRequestLogout={requestLogout}
-          onSaveContent={saveContent}
-          saveStatus={saveStatus}
-          onUndo={undo}
-          onRedo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
-        />
+        <ErrorBoundary>
+          <AdminPanel
+            content={safeContent}
+            onChangeContent={setContent}
+            onResetContent={resetContent}
+            isAuthenticated={isAuthenticated}
+            onRequestLogin={requestLogin}
+            onRequestLogout={requestLogout}
+            onSaveContent={saveContent}
+            saveStatus={saveStatus}
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+          />
+        </ErrorBoundary>
       ) : (
-        <PublicSite content={content} onOpenLightbox={openLightbox} />
+        <PublicSite content={safeContent} onOpenLightbox={openLightbox} />
       )}
 
       <Lightbox
