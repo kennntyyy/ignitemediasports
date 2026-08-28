@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { defaultContent } from '../api/defaultContent.js';
 import { STORAGE_KEY, readStoredContent } from './lib/storage.js';
+import { useUndoableState } from './lib/history.js';
 import AdminPanel from './components/AdminPanel.jsx';
 import PublicSite from './components/PublicSite.jsx';
 import Lightbox from './components/Lightbox.jsx';
 
 export default function App() {
-  const [content, setContent] = useState(() => readStoredContent());
+  const { present: content, set: setContent, undo, redo, replace: replaceContent, canUndo, canRedo } =
+    useUndoableState(readStoredContent());
   const [lightbox, setLightbox] = useState(null); // { photos, index } | null
   const adminMode = new URLSearchParams(window.location.search).get('admin') === '1';
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -18,7 +20,7 @@ export default function App() {
         const response = await fetch('/api/content');
         if (response.ok) {
           const remoteContent = await response.json();
-          setContent(remoteContent);
+          replaceContent(remoteContent);
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteContent));
         }
       } catch {
@@ -27,7 +29,7 @@ export default function App() {
     };
 
     void loadContent();
-  }, []);
+  }, [replaceContent]);
 
   useEffect(() => {
     if (!adminMode) return;
@@ -81,7 +83,7 @@ export default function App() {
       const contentResponse = await fetch('/api/content');
       if (contentResponse.ok) {
         const remoteContent = await contentResponse.json();
-        setContent(remoteContent);
+        replaceContent(remoteContent);
       }
     } catch {
       // Leave the current content in place.
@@ -120,6 +122,24 @@ export default function App() {
     setSaveStatus('ready');
   };
 
+  // Keyboard shortcuts for admin undo/redo
+  useEffect(() => {
+    if (!adminMode || !isAuthenticated) return;
+    const handler = (e) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [adminMode, isAuthenticated, undo, redo]);
+
   return (
     <>
       {adminMode ? (
@@ -132,6 +152,10 @@ export default function App() {
           onRequestLogout={requestLogout}
           onSaveContent={saveContent}
           saveStatus={saveStatus}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
         />
       ) : (
         <PublicSite content={content} onOpenLightbox={openLightbox} />

@@ -10,6 +10,10 @@ export default function AdminPanel({
   onRequestLogout,
   onSaveContent,
   saveStatus,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }) {
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
@@ -36,6 +40,7 @@ export default function AdminPanel({
               <h1>Sign in to edit</h1>
               <p>Use the site password to unlock the shared editor. Changes save to the remote content store after you sign in.</p>
             </div>
+            <a className="ghost-btn" href="/">← Back to site</a>
           </div>
 
           <form className="admin-card" onSubmit={handleLogin}>
@@ -163,6 +168,31 @@ export default function AdminPanel({
     }));
   };
 
+  const movePortfolioPhoto = (sectionIndex, from, to) => {
+    if (to < 0) return;
+    onChangeContent((current) => ({
+      ...current,
+      portfolio: current.portfolio.map((section, index) => {
+        if (index !== sectionIndex) return section;
+        if (to >= section.photos.length) return section;
+        const next = [...section.photos];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return { ...section, photos: next };
+      }),
+    }));
+  };
+
+  const [dragged, setDragged] = useState(null); // { sectionIndex, photoIndex }
+  const handleDragStart = (sectionIndex, photoIndex) => setDragged({ sectionIndex, photoIndex });
+  const handleDragOver = (e) => e.preventDefault();
+  const handleDrop = (sectionIndex, targetIndex) => {
+    if (!dragged || dragged.sectionIndex !== sectionIndex) return;
+    if (dragged.photoIndex === targetIndex) return;
+    movePortfolioPhoto(sectionIndex, dragged.photoIndex, targetIndex);
+    setDragged(null);
+  };
+
   const updateService = (index, field, value) => {
     onChangeContent((current) => ({
       ...current,
@@ -182,6 +212,12 @@ export default function AdminPanel({
             <p>Changes stay in sync with the shared site content store. Photos can be pasted as URLs or uploaded as files.</p>
           </div>
           <div className="admin-actions">
+            <button className="ghost-btn" onClick={onUndo} disabled={!canUndo} title={canUndo ? 'Undo (Ctrl+Z)' : 'Nothing to undo'}>
+              Undo
+            </button>
+            <button className="ghost-btn" onClick={onRedo} disabled={!canRedo} title={canRedo ? 'Redo (Ctrl+Shift+Z)' : 'Nothing to redo'}>
+              Redo
+            </button>
             <button className="ghost-btn" onClick={onRequestLogout}>Log out</button>
             <button className="cta-btn" onClick={() => void onSaveContent().catch(() => {})}>Save changes</button>
             <a className="ghost-btn" href="/">View live site</a>
@@ -314,11 +350,38 @@ export default function AdminPanel({
 
                 <div className="photo-chip-grid">
                   {section.photos.map((photo, photoIndex) => (
-                    <div className="photo-chip" key={`${photo}-${photoIndex}`}>
+                    <div
+                      className="photo-chip"
+                      key={`${photo}-${photoIndex}`}
+                      draggable
+                      onDragStart={() => handleDragStart(index, photoIndex)}
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDrop(index, photoIndex)}
+                      title="Drag to reorder"
+                    >
                       <img src={photo} alt="Uploaded preview" />
-                      <button className="photo-chip-remove" onClick={() => removePortfolioPhoto(index, photoIndex)}>
-                        Remove
-                      </button>
+                      <div className="photo-chip-actions">
+                        <button
+                          className="ghost-btn photo-chip-move"
+                          disabled={photoIndex === 0}
+                          onClick={() => movePortfolioPhoto(index, photoIndex, photoIndex - 1)}
+                          title="Move left"
+                        >
+                          ←
+                        </button>
+                        <button
+                          className="ghost-btn photo-chip-move"
+                          disabled={photoIndex === section.photos.length - 1}
+                          onClick={() => movePortfolioPhoto(index, photoIndex, photoIndex + 1)}
+                          title="Move right"
+                        >
+                          →
+                        </button>
+                        <button className="photo-chip-remove" onClick={() => removePortfolioPhoto(index, photoIndex)}>
+                          Remove
+                        </button>
+                      </div>
+                      <span className="photo-chip-index">{photoIndex + 1}</span>
                     </div>
                   ))}
                 </div>
