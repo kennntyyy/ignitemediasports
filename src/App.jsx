@@ -41,6 +41,7 @@ export default function App() {
   const adminMode = new URLSearchParams(window.location.search).get('admin') === '1';
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [saveStatus, setSaveStatus] = useState('ready');
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     const loadContent = async () => {
@@ -49,7 +50,7 @@ export default function App() {
         if (response.ok) {
           const remoteContent = await response.json();
           replaceContent(remoteContent);
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteContent));
+          try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteContent)); } catch {}
         }
       } catch {
         // Keep the current draft/default content if the shared store is unavailable.
@@ -78,7 +79,22 @@ export default function App() {
   }, [adminMode]);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
+    try {
+      const serialized = JSON.stringify(content);
+      // localStorage quota is ~5MB — data URLs blow past it after a few uploads
+      if (serialized.length > 4_500_000) {
+        console.warn('Content too large for local draft — skipping localStorage save. Use URL references or smaller images.');
+        return;
+      }
+      window.localStorage.setItem(STORAGE_KEY, serialized);
+    } catch (e) {
+      if (e?.name === 'QuotaExceededError' || String(e).includes('QuotaExceeded')) {
+        console.warn('localStorage quota exceeded — draft not saved locally. Save to server still works.');
+        try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
+      } else {
+        console.error(e);
+      }
+    }
   }, [content]);
 
   const openLightbox = (photos, index) => setLightbox({ photos, index });
@@ -128,6 +144,14 @@ export default function App() {
 
   const saveContent = async () => {
     setSaveStatus('saving');
+    setSaveError('');
+    // client pre-check mirrors api/content.js:4 limit
+    if (JSON.stringify(content).length > 900000) {
+      const msg = `Content too large (${Math.round(JSON.stringify(content).length / 1024)}KB). Limit 900KB. Remove some uploaded photos or use URL references.`;
+      setSaveStatus('error');
+      setSaveError(msg);
+      throw new Error(msg);
+    }
 
     const response = await fetch('/api/content', {
       method: 'PUT',
@@ -138,11 +162,13 @@ export default function App() {
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
       setSaveStatus('error');
-      throw new Error(payload?.error ?? 'Unable to save content');
+      const msg = payload?.error ?? 'Unable to save content';
+      setSaveError(msg);
+      throw new Error(msg);
     }
 
     setSaveStatus('saved');
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(content)); } catch {}
   };
 
   const resetContent = () => {
@@ -184,6 +210,7 @@ export default function App() {
             onRequestLogout={requestLogout}
             onSaveContent={saveContent}
             saveStatus={saveStatus}
+            saveError={saveError}
             onUndo={undo}
             onRedo={redo}
             canUndo={canUndo}

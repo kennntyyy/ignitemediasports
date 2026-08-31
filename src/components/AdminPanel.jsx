@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { fileToDataUrl, parsePhotoInput } from '../lib/image.js';
+import { fileToCompressedDataUrl, parsePhotoInput } from '../lib/image.js';
 
 export default function AdminPanel({
   content,
@@ -10,6 +10,7 @@ export default function AdminPanel({
   onRequestLogout,
   onSaveContent,
   saveStatus,
+  saveError,
   onUndo,
   onRedo,
   canUndo,
@@ -145,7 +146,20 @@ export default function AdminPanel({
     const nextFiles = Array.from(files ?? []);
     if (nextFiles.length === 0) return;
 
-    const uploaded = await Promise.all(nextFiles.map((file) => fileToDataUrl(file)));
+    // Pre-check file sizes before compression
+    for (const f of nextFiles) {
+      if (f.size > 12 * 1024 * 1024) {
+        alert(`"${f.name}" is ${(f.size / 1024 / 1024).toFixed(1)}MB — please use a file under 12MB or paste a URL instead.`);
+        return;
+      }
+    }
+
+    const uploaded = await Promise.all(nextFiles.map((file) => fileToCompressedDataUrl(file)));
+    const estimated = JSON.stringify(content).length + uploaded.join('').length;
+    if (estimated > 900000) {
+      alert(`Adding these photos would exceed the 900KB total storage limit (estimated ${Math.round(estimated / 1024)}KB). Remove some existing uploaded photos or use URL references (/photos/...) instead.`);
+      return;
+    }
 
     onChangeContent((current) => ({
       ...current,
@@ -227,7 +241,16 @@ export default function AdminPanel({
 
         <div className="admin-status-row">
           <span className={`admin-status-pill ${saveStatus}`}>{saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving' : saveStatus === 'error' ? 'Save failed' : 'Ready'}</span>
+          {saveError ? <span className="admin-error" style={{ marginLeft: 12 }}>{saveError}</span> : null}
+          <span className="admin-storage-hint" style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: JSON.stringify(content).length > 800000 ? '#ff6b6b' : 'var(--smoke)' }}>
+            Storage: {Math.round(JSON.stringify(content).length / 1024)}KB / 900KB
+          </span>
         </div>
+        {JSON.stringify(content).length > 800000 ? (
+          <div className="admin-error" style={{ marginBottom: 12 }}>
+            Near storage limit — remove some uploaded photos or use URL references (e.g. /photos/...) instead of file uploads. Single files are compressed, but total content must stay under 900KB.
+          </div>
+        ) : null}
 
         <section className="admin-card">
           <div className="admin-card-title">Theme settings</div>
