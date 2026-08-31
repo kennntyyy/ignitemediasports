@@ -81,15 +81,14 @@ export default function App() {
   useEffect(() => {
     try {
       const serialized = JSON.stringify(content);
-      // localStorage quota is ~5MB — data URLs blow past it after a few uploads
+      // localStorage is ~5MB — skip for very large drafts (still saved on server)
       if (serialized.length > 4_500_000) {
-        console.warn('Content too large for local draft — skipping localStorage save. Use URL references or smaller images.');
+        try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
         return;
       }
       window.localStorage.setItem(STORAGE_KEY, serialized);
     } catch (e) {
       if (e?.name === 'QuotaExceededError' || String(e).includes('QuotaExceeded')) {
-        console.warn('localStorage quota exceeded — draft not saved locally. Save to server still works.');
         try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
       } else {
         console.error(e);
@@ -145,9 +144,9 @@ export default function App() {
   const saveContent = async () => {
     setSaveStatus('saving');
     setSaveError('');
-    // client pre-check mirrors api/content.js:4 limit
-    if (JSON.stringify(content).length > 900000) {
-      const msg = `Content too large (${Math.round(JSON.stringify(content).length / 1024)}KB). Limit 900KB. Remove some uploaded photos or use URL references.`;
+    // client pre-check mirrors api/content.js:4 limit (80MB chunked)
+    if (JSON.stringify(content).length > 80 * 1024 * 1024) {
+      const msg = `Content too large (${Math.round(JSON.stringify(content).length / 1024 / 1024)}MB). Limit 80MB. Remove some uploaded photos.`;
       setSaveStatus('error');
       setSaveError(msg);
       throw new Error(msg);

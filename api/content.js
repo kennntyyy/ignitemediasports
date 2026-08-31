@@ -1,7 +1,7 @@
 import { getStoredContent, setStoredContent } from './_lib/store.js';
 import { hasValidSession } from './_lib/auth.js';
 
-const MAX_CONTENT_BYTES = 900_000; // keep below Upstash 1MB limit; leaves headroom
+const MAX_CONTENT_BYTES = 80 * 1024 * 1024; // 80MB — chunked in store.js to stay under per-value 1MB
 
 async function readJsonBody(request) {
   const chunks = [];

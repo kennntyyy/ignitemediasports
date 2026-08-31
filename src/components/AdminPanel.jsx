@@ -156,8 +156,8 @@ export default function AdminPanel({
 
     const uploaded = await Promise.all(nextFiles.map((file) => fileToCompressedDataUrl(file)));
     const estimated = JSON.stringify(content).length + uploaded.join('').length;
-    if (estimated > 900000) {
-      alert(`Adding these photos would exceed the 900KB total storage limit (estimated ${Math.round(estimated / 1024)}KB). Remove some existing uploaded photos or use URL references (/photos/...) instead.`);
+    if (estimated > 80 * 1024 * 1024) {
+      alert(`Adding these photos would exceed the 80MB total limit (estimated ${(estimated / 1024 / 1024).toFixed(1)}MB).`);
       return;
     }
 
@@ -242,13 +242,13 @@ export default function AdminPanel({
         <div className="admin-status-row">
           <span className={`admin-status-pill ${saveStatus}`}>{saveStatus === 'saved' ? 'Saved' : saveStatus === 'saving' ? 'Saving' : saveStatus === 'error' ? 'Save failed' : 'Ready'}</span>
           {saveError ? <span className="admin-error" style={{ marginLeft: 12 }}>{saveError}</span> : null}
-          <span className="admin-storage-hint" style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: JSON.stringify(content).length > 800000 ? '#ff6b6b' : 'var(--smoke)' }}>
-            Storage: {Math.round(JSON.stringify(content).length / 1024)}KB / 900KB
+          <span className="admin-storage-hint" style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: JSON.stringify(content).length > 70 * 1024 * 1024 ? '#ff6b6b' : 'var(--smoke)' }}>
+            Storage: {(JSON.stringify(content).length / 1024 / 1024).toFixed(2)}MB / 80MB
           </span>
         </div>
-        {JSON.stringify(content).length > 800000 ? (
+        {JSON.stringify(content).length > 70 * 1024 * 1024 ? (
           <div className="admin-error" style={{ marginBottom: 12 }}>
-            Near storage limit — remove some uploaded photos or use URL references (e.g. /photos/...) instead of file uploads. Single files are compressed, but total content must stay under 900KB.
+            Near 80MB limit — consider removing some uploaded photos or using URL references.
           </div>
         ) : null}
 
